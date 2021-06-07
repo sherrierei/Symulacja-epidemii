@@ -159,3 +159,5 @@ T = 800
 
 area_epidemic_simulation(size, N0, meetings, incubation_time, immunity_time, lockdowns,
         vaccination_day, vaccinations, vaccine_immunity_time, death_prop, recovery_prop, infection_propability, symptoms_prop, T)
+
+#xdddd // A
