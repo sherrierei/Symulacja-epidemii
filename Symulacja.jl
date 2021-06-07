@@ -1,7 +1,7 @@
 using Plots
 
 function area_epidemic_simulation(size, N0, meetings, incubation_time, immunity_time, lockdowns,
-    vaccination_day, vaccinations, death_prop, recovery_prop, infection_propability, T)
+    vaccination_day, vaccinations, vaccine_immunity_time, death_prop, recovery_prop, infection_propability, symptoms_prop, T)
     # 0 - dead
     # 1 - susceptible
     # 2 - exposed
@@ -12,8 +12,10 @@ function area_epidemic_simulation(size, N0, meetings, incubation_time, immunity_
     susceptible = collect(1:size^2)
     exposed = []
     infected = []
+    infected_asymptomatic = []
     recovered = []
     vaccinated = []
+    unvaccinated = collect(1:size^2)
     infected_record = [N0]
     population = ones(size, size)
     infection_days = fill(T, size, size)
@@ -43,13 +45,14 @@ function area_epidemic_simulation(size, N0, meetings, incubation_time, immunity_
 
         # Vaccination
         if t >= vaccination_day
+            possible_to_vaccinate = filter(i -> i ∉ infected, unvaccinated)
             for person in 1:vaccinations
                 try
-                    index = rand(vcat(susceptible, exposed, recovered))
+                    index = rand(possible_to_vaccinate)
                     append!(vaccinated, index)
-                    filter!(i -> i != index, susceptible)
-                    filter!(i -> i != index, exposed)
-                    filter!(i -> i != index, recovered)
+                    filter!(i -> i != index, unvaccinated)
+                    filter!(i -> i != index, possible_to_vaccinate)
+                    vaccination_days[index] = t
                 catch ArgumentError
                     continue
                 end
@@ -65,8 +68,18 @@ function area_epidemic_simulation(size, N0, meetings, incubation_time, immunity_
                 # If person is exposed and incubation time has ended, change his status to infected
                 if population[index] == 2 && t - infection_days[index] >= incubation_time
                     population[index] = 3
-                    append!(infected, index)
+                    if rand()<symptoms_prop
+                        append!(infected, index)
+                    else
+                        append!(infected_asymptomatic, index)
+                    end
                     filter!(i -> i != index, exposed)
+                end
+
+                # If vaccine immunity time has ended
+                if t - vaccination_days[index] >= vaccine_immunity_time
+                    append!(unvaccinated, index)
+                    filter!(i -> i != index, vaccinated)
                 end
                 
                 # If the person is infected
@@ -95,9 +108,10 @@ function area_epidemic_simulation(size, N0, meetings, incubation_time, immunity_
                         population[index] = 4
                         append!(recovered, index)
                         filter!(i -> i != index, infected)
+                        filter!(i -> i != index, infected_asymptomatic)
                         recovery_days[row, person] = t
 
-                    elseif rand()<death_prop
+                    elseif index ∈ infected && rand()<death_prop
                         population[index] = 0
                         append!(dead, index)
                         filter!(i -> i != index, infected)
@@ -111,7 +125,8 @@ function area_epidemic_simulation(size, N0, meetings, incubation_time, immunity_
                 end
             end
         end
-        append!(infected_record, length(infected))
+        infected_number = length(infected) + length(infected_asymptomatic)
+        append!(infected_record, infected_number)
         deaths = length(dead)
         
         heatmap(population,
@@ -131,14 +146,16 @@ size = 100
 N0 = 10
 meetings = 3
 incubation_time = 3
-immunity_time = 90
+immunity_time = 100
 lockdowns = []
-vaccination_day = 400
-vaccinations = 100
+vaccination_day = 200
+vaccinations = 30
+vaccine_immunity_time = 180
 death_prop = 0.001
 recovery_prop = 0.05
 infection_propability = 0.2
+symptoms_prop = 0.5
 T = 800
 
 area_epidemic_simulation(size, N0, meetings, incubation_time, immunity_time, lockdowns,
-        vaccination_day, vaccinations, death_prop, recovery_prop, infection_propability, T)
+        vaccination_day, vaccinations, vaccine_immunity_time, death_prop, recovery_prop, infection_propability, symptoms_prop, T)
